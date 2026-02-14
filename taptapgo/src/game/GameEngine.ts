@@ -392,7 +392,8 @@ export class GameEngine {
         this.hideOverlay();
         this.startMultiplayerGame(code);
       } else {
-        errorEl.textContent = 'Room introuvable ou pleine';
+        const errorMsg = this.firebaseService.getLastError() || 'Room introuvable ou pleine';
+        errorEl.textContent = errorMsg;
         errorEl.style.color = CSS_COLORS.error;
       }
     });
@@ -426,16 +427,62 @@ export class GameEngine {
     };
 
     this.isHost = true;
+
+    // Afficher un écran de chargement pendant la création
+    this.showOverlay(`
+      <div class="screen-content">
+        <h2 class="title" style="color: ${CSS_COLORS.primary}; font-size: 28px;">Création...</h2>
+        <div class="waiting-dots">
+          <span class="dot dot-1"></span>
+          <span class="dot dot-2"></span>
+          <span class="dot dot-3"></span>
+        </div>
+        <p class="hint">Connexion au serveur...</p>
+      </div>
+    `);
+
     const code = await this.firebaseService.createRoom(this.myPlayer, phrases);
 
     if (code) {
       this.roomCode = code;
+      this.hideOverlay();
       this.showWaitingRoom(code);
     } else {
-      // Firebase configuré mais erreur de connexion → salle d'attente offline
-      console.warn('[GameEngine] Échec création room Firebase, fallback offline');
-      this.showWaitingRoomOffline();
+      // Firebase configuré mais erreur → afficher erreur avec options
+      console.warn('[GameEngine] Échec création room Firebase');
+      this.showCreateRoomError();
     }
+  }
+
+  // Affiche une erreur quand la création de room échoue
+  private showCreateRoomError(): void {
+    this.showOverlay(`
+      <div class="screen-content">
+        <h2 class="title" style="color: ${CSS_COLORS.error}; font-size: 24px;">Erreur de connexion</h2>
+        <p class="subtitle">Impossible de créer la room sur le serveur.</p>
+        <p class="hint" style="color: ${CSS_COLORS.accent};">Vérifie ta connexion internet et la configuration Firebase.</p>
+        <div class="menu-buttons">
+          <button id="btn-retry-create" class="btn btn-primary btn-large">Réessayer</button>
+          <button id="btn-solo-fallback" class="btn btn-accent btn-large">Jouer contre le Bot</button>
+          <button id="btn-error-back" class="btn btn-outline btn-large">Retour au menu</button>
+        </div>
+      </div>
+    `);
+
+    document.getElementById('btn-retry-create')?.addEventListener('click', () => {
+      this.hideOverlay();
+      this.createRoom();
+    });
+
+    document.getElementById('btn-solo-fallback')?.addEventListener('click', () => {
+      this.hideOverlay();
+      this.startSoloGame();
+    });
+
+    document.getElementById('btn-error-back')?.addEventListener('click', () => {
+      this.hideOverlay();
+      this.showMenu();
+    });
   }
 
   // ==========================================
@@ -512,8 +559,6 @@ export class GameEngine {
     this.currentScreen = 'waiting';
     console.log('[GameEngine] Écran: Salle d\'attente (offline)');
 
-    const fakeCode = this.generateOfflineCode();
-
     this.app.stage.removeChildren();
     const bg = new PIXI.Graphics();
     bg.beginFill(COLORS.background);
@@ -523,15 +568,15 @@ export class GameEngine {
 
     this.showOverlay(`
       <div class="screen-content">
-        <h2 class="title" style="color: ${CSS_COLORS.primary}; font-size: 28px;">En attente...</h2>
-        <p class="subtitle">Partage ce code avec ton adversaire</p>
-        <div class="room-code">${fakeCode}</div>
+        <h2 class="title" style="color: ${CSS_COLORS.primary}; font-size: 28px;">Recherche...</h2>
+        <p class="subtitle">Recherche d'un adversaire</p>
         <div class="waiting-dots">
           <span class="dot dot-1"></span>
           <span class="dot dot-2"></span>
           <span class="dot dot-3"></span>
         </div>
         <p class="hint" style="color: ${CSS_COLORS.accent};">Mode hors-ligne : un bot rejoindra dans <span id="bot-countdown-offline">10</span>s</p>
+        <p class="hint" style="font-size: 11px; margin-top: 8px;">Pour jouer en multijoueur, configure Firebase dans les paramètres</p>
         <button id="btn-cancel-wait-offline" class="btn btn-outline" style="margin-top: 20px;">Annuler</button>
       </div>
     `);
@@ -560,16 +605,6 @@ export class GameEngine {
       this.hideOverlay();
       this.showMenu();
     });
-  }
-
-  // Génère un faux code de room pour le mode offline
-  private generateOfflineCode(): string {
-    const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-    const digits = '0123456789';
-    let code = '';
-    for (let i = 0; i < 2; i++) code += letters[Math.floor(Math.random() * letters.length)];
-    for (let i = 0; i < 2; i++) code += digits[Math.floor(Math.random() * digits.length)];
-    return code;
   }
 
   // ==========================================

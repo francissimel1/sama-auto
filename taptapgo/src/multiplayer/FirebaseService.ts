@@ -68,7 +68,8 @@ export class FirebaseService {
   // Crée une nouvelle room
   async createRoom(player: Player, phrases: string[]): Promise<string | null> {
     if (!this.initialized || !this.db) {
-      console.warn('[FirebaseService] Firebase non initialisé');
+      console.warn('[FirebaseService] Firebase non initialisé - impossible de créer une room');
+      console.warn('[FirebaseService] initialized:', this.initialized, 'db:', !!this.db);
       return null;
     }
 
@@ -86,19 +87,31 @@ export class FirebaseService {
         createdAt: Date.now(),
       };
 
+      console.log(`[FirebaseService] Tentative création room: ${code} (id: ${roomId})`);
       this.roomRef = ref(this.db, `rooms/${roomId}`);
       await set(this.roomRef, { ...room, phrases });
-      console.log(`[FirebaseService] Room créée: ${code}`);
+      console.log(`[FirebaseService] Room créée avec succès: ${code}`);
       return code;
-    } catch (e) {
+    } catch (e: any) {
       console.error('[FirebaseService] Erreur création room:', e);
+      console.error('[FirebaseService] Code erreur:', e?.code || 'inconnu');
+      console.error('[FirebaseService] Message:', e?.message || 'pas de message');
       return null;
     }
   }
 
+  // Retourne le dernier message d'erreur
+  getLastError(): string {
+    return this.lastError;
+  }
+  private lastError: string = '';
+
   // Rejoint une room existante
   async joinRoom(code: string, player: Player): Promise<Room | null> {
+    this.lastError = '';
+
     if (!this.initialized || !this.db) {
+      this.lastError = 'Firebase non initialisé. Vérifie ta configuration.';
       console.warn('[FirebaseService] Firebase non initialisé');
       return null;
     }
@@ -106,21 +119,27 @@ export class FirebaseService {
     try {
       const { ref, get, update } = await import('firebase/database');
       const roomId = code.toLowerCase();
+      console.log(`[FirebaseService] Recherche room: ${code} (id: ${roomId})`);
       this.roomRef = ref(this.db, `rooms/${roomId}`);
 
       const snapshot = await get(this.roomRef);
       if (!snapshot.exists()) {
-        console.warn(`[FirebaseService] Room ${code} introuvable`);
+        this.lastError = `Room "${code}" introuvable. Vérifie le code.`;
+        console.warn(`[FirebaseService] Room ${code} introuvable dans la base`);
         return null;
       }
 
       const roomData = snapshot.val();
+      console.log(`[FirebaseService] Room trouvée - status: ${roomData.status}, players: ${roomData.players?.length || 0}`);
+
       if (roomData.status !== 'waiting') {
-        console.warn(`[FirebaseService] Room ${code} n'est plus en attente`);
+        this.lastError = `La partie "${code}" a déjà commencé.`;
+        console.warn(`[FirebaseService] Room ${code} n'est plus en attente (status: ${roomData.status})`);
         return null;
       }
 
       if (roomData.players && roomData.players.length >= 2) {
+        this.lastError = `La room "${code}" est pleine (2/2 joueurs).`;
         console.warn(`[FirebaseService] Room ${code} est pleine`);
         return null;
       }
@@ -132,13 +151,14 @@ export class FirebaseService {
         status: 'playing',
       });
 
-      console.log(`[FirebaseService] Rejoint room ${code}`);
+      console.log(`[FirebaseService] Rejoint room ${code} avec succès`);
       return {
         ...roomData,
         players,
         status: 'playing' as RoomStatus,
       };
-    } catch (e) {
+    } catch (e: any) {
+      this.lastError = `Erreur réseau: ${e?.message || 'connexion impossible'}`;
       console.error('[FirebaseService] Erreur join room:', e);
       return null;
     }
