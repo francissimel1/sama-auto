@@ -432,8 +432,9 @@ export class GameEngine {
       this.roomCode = code;
       this.showWaitingRoom(code);
     } else {
-      // Fallback mode solo
-      this.startSoloGame();
+      // Firebase configuré mais erreur de connexion → salle d'attente offline
+      console.warn('[GameEngine] Échec création room Firebase, fallback offline');
+      this.showWaitingRoomOffline();
     }
   }
 
