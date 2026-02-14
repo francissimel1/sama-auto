@@ -654,33 +654,64 @@ export class GameEngine {
     this.totalAttempts = 0;
     this.gameStartTime = Date.now();
 
-    // Écouter les mises à jour de la room
-    this.firebaseService.onRoomChange(code, (room) => {
-      // Mettre à jour la position de l'adversaire
-      if (room.players) {
-        const opponentData = room.players.find((p: Player) => p.id !== this.myPlayer?.id);
-        if (opponentData && this.opponent) {
-          this.opponent.position = opponentData.position;
-          this.updateTrack();
-        }
-      }
-
-      // Vérifier si l'adversaire a gagné
-      if (room.status === 'finished' && room.winner && room.winner !== this.myPlayer?.id) {
-        this.endGame(false);
-      }
-    });
-
-    // Si on est le joueur qui rejoint, récupérer les phrases de la room
+    // Si on est le joueur qui rejoint, récupérer les phrases AVANT d'afficher l'écran
     if (!this.isHost) {
+      // Attendre que les phrases arrivent de Firebase avant d'afficher
+      let phrasesLoaded = false;
       this.firebaseService.onRoomChange(code, (room) => {
-        if (room.phrases) {
+        // Synchroniser les phrases une seule fois
+        if (room.phrases && !phrasesLoaded) {
+          phrasesLoaded = true;
           this.phraseManager.setGamePhrases(room.phrases);
+          console.log('[GameEngine] Phrases reçues de Firebase, affichage écran de jeu');
+          this.showGameScreen();
+        }
+
+        // Mettre à jour la position de l'adversaire
+        if (room.players) {
+          const opponentData = room.players.find((p: Player) => p.id !== this.myPlayer?.id);
+          if (opponentData && this.opponent) {
+            this.opponent.position = opponentData.position;
+            this.updateTrack();
+            this.updateScores();
+          }
+        }
+
+        // Mettre à jour l'affichage de la phrase si elle a changé (pour le joueur qui rejoint)
+        if (phrasesLoaded) {
+          const phraseDisplay = document.getElementById('phrase-display');
+          const currentPhrase = this.phraseManager.getCurrentPhrase();
+          if (phraseDisplay && currentPhrase && !phraseDisplay.textContent) {
+            phraseDisplay.textContent = currentPhrase;
+          }
+        }
+
+        // Vérifier si l'adversaire a gagné
+        if (room.status === 'finished' && room.winner && room.winner !== this.myPlayer?.id) {
+          this.endGame(false);
         }
       });
-    }
+    } else {
+      // Pour l'hôte, écouter les mises à jour de la room
+      this.firebaseService.onRoomChange(code, (room) => {
+        // Mettre à jour la position de l'adversaire
+        if (room.players) {
+          const opponentData = room.players.find((p: Player) => p.id !== this.myPlayer?.id);
+          if (opponentData && this.opponent) {
+            this.opponent.position = opponentData.position;
+            this.updateTrack();
+            this.updateScores();
+          }
+        }
 
-    this.showGameScreen();
+        // Vérifier si l'adversaire a gagné
+        if (room.status === 'finished' && room.winner && room.winner !== this.myPlayer?.id) {
+          this.endGame(false);
+        }
+      });
+
+      this.showGameScreen();
+    }
   }
 
   // ==========================================
