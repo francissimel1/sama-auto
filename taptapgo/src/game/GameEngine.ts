@@ -814,27 +814,27 @@ export class GameEngine {
 
     // === FOND TERRAIN (vert gazon) ===
     const field = new PIXI.Graphics();
-    field.beginFill(0x1B5E20, 0.15);
+    field.beginFill(0x1B5E20, 0.35);
     field.drawRoundedRect(trackX - 5, trackY - 5, trackWidth + 10, trackHeight + 10, cornerRadius + 5);
     field.endFill();
     this.trackContainer.addChild(field);
 
     // === SURFACE DE LA PISTE (rouge brique) ===
     const trackSurface = new PIXI.Graphics();
-    trackSurface.beginFill(0xC62828, 0.85);
+    trackSurface.beginFill(0xD32F2F, 1);
     trackSurface.drawRoundedRect(trackX, trackY, trackWidth, trackHeight, cornerRadius);
     trackSurface.endFill();
     this.trackContainer.addChild(trackSurface);
 
     // === BORDURE EXTÉRIEURE ===
     const outerBorder = new PIXI.Graphics();
-    outerBorder.lineStyle(2, 0xFFFFFF, 0.6);
+    outerBorder.lineStyle(3, 0xFFFFFF, 0.85);
     outerBorder.drawRoundedRect(trackX + 2, trackY + 2, trackWidth - 4, trackHeight - 4, cornerRadius - 2);
     this.trackContainer.addChild(outerBorder);
 
     // === ZONE INTÉRIEURE (gazon central) ===
     const innerField = new PIXI.Graphics();
-    innerField.beginFill(0x2E7D32, 0.3);
+    innerField.beginFill(0x388E3C, 0.5);
     innerField.drawRoundedRect(trackX + 12, trackY + 12, trackWidth - 24, 32, 10);
     innerField.endFill();
     this.trackContainer.addChild(innerField);
@@ -859,26 +859,26 @@ export class GameEngine {
 
       // Fond du couloir
       const laneBg = new PIXI.Graphics();
-      laneBg.beginFill(laneColor, 0.6);
+      laneBg.beginFill(laneColor, 0.9);
       laneBg.drawRoundedRect(trackX + 8, laneY, trackWidth - 16, laneHeight, 8);
       laneBg.endFill();
       this.trackContainer.addChild(laneBg);
 
       // Bordure blanche du couloir
       const laneBorder = new PIXI.Graphics();
-      laneBorder.lineStyle(1, 0xFFFFFF, 0.35);
+      laneBorder.lineStyle(2, 0xFFFFFF, 0.6);
       laneBorder.drawRoundedRect(trackX + 8, laneY, trackWidth - 16, laneHeight, 8);
       this.trackContainer.addChild(laneBorder);
 
       // Numéro du couloir
       const laneNum = new PIXI.Text(`${lane + 1}`, {
         fontFamily: 'Arial, sans-serif',
-        fontSize: 14,
+        fontSize: 16,
         fill: 0xFFFFFF,
         fontWeight: 'bold',
       });
       laneNum.anchor.set(0.5);
-      laneNum.alpha = 0.4;
+      laneNum.alpha = 0.7;
       laneNum.x = trackX + 20;
       laneNum.y = laneY + laneHeight / 2;
       this.trackContainer.addChild(laneNum);
@@ -897,7 +897,7 @@ export class GameEngine {
         // Ligne d'arrivée : damier
         line.lineStyle(3, COLORS.accent, 1);
       } else {
-        line.lineStyle(1, 0xFFFFFF, i === 0 ? 0.7 : 0.3);
+        line.lineStyle(1.5, 0xFFFFFF, i === 0 ? 0.9 : 0.5);
       }
       line.moveTo(x, lane1Y - 2);
       line.lineTo(x, lane2Y + laneHeight + 2);
@@ -912,7 +912,7 @@ export class GameEngine {
           fontWeight: isFinish ? 'bold' : 'normal',
         });
         distLabel.anchor.set(0.5);
-        distLabel.alpha = isFinish ? 1 : 0.5;
+        distLabel.alpha = isFinish ? 1 : 0.75;
         distLabel.x = x;
         distLabel.y = lane1Y - 12;
         this.trackContainer.addChild(distLabel);
@@ -1019,8 +1019,8 @@ export class GameEngine {
 
     // Ombre au sol
     const shadow = new PIXI.Graphics();
-    shadow.beginFill(0x000000, 0.2);
-    shadow.drawEllipse(playerX, centerY + 14, 12, 4);
+    shadow.beginFill(0x000000, 0.35);
+    shadow.drawEllipse(playerX, centerY + 16, 14, 5);
     shadow.endFill();
     this.trackContainer.addChild(shadow);
 
@@ -1029,39 +1029,39 @@ export class GameEngine {
 
     // Jambes (en mouvement)
     const legAngle = position > 0 ? Math.sin(position * 1.5) * 0.3 : 0;
-    runner.lineStyle(3, color, 1);
+    runner.lineStyle(4, color, 1);
     // Jambe arrière
     runner.moveTo(playerX, centerY + 4);
-    runner.lineTo(playerX - 5 - legAngle * 10, centerY + 14);
+    runner.lineTo(playerX - 6 - legAngle * 10, centerY + 16);
     // Jambe avant
     runner.moveTo(playerX, centerY + 4);
-    runner.lineTo(playerX + 5 + legAngle * 10, centerY + 14);
+    runner.lineTo(playerX + 6 + legAngle * 10, centerY + 16);
 
     // Bras (en mouvement)
-    runner.lineStyle(2, color, 0.9);
+    runner.lineStyle(3, color, 1);
     // Bras arrière
     runner.moveTo(playerX, centerY - 4);
-    runner.lineTo(playerX - 6 + legAngle * 8, centerY + 2);
+    runner.lineTo(playerX - 7 + legAngle * 8, centerY + 3);
     // Bras avant
     runner.moveTo(playerX, centerY - 4);
-    runner.lineTo(playerX + 6 - legAngle * 8, centerY + 2);
+    runner.lineTo(playerX + 7 - legAngle * 8, centerY + 3);
     this.trackContainer.addChild(runner);
 
     // Tête (cercle avec initiale)
-    const headRadius = 11;
-    const headY = centerY - 13;
+    const headRadius = 13;
+    const headY = centerY - 14;
 
-    // Contour lumineux autour de la tête
+    // Contour lumineux autour de la tête (glow plus visible)
     const glow = new PIXI.Graphics();
-    glow.beginFill(color, 0.2);
-    glow.drawCircle(playerX, headY, headRadius + 4);
+    glow.beginFill(color, 0.35);
+    glow.drawCircle(playerX, headY, headRadius + 6);
     glow.endFill();
     this.trackContainer.addChild(glow);
 
     // Cercle de la tête
     const head = new PIXI.Graphics();
     head.beginFill(color);
-    head.lineStyle(2, 0xFFFFFF, 0.8);
+    head.lineStyle(3, 0xFFFFFF, 0.95);
     head.drawCircle(playerX, headY, headRadius);
     head.endFill();
     this.trackContainer.addChild(head);
@@ -1069,7 +1069,7 @@ export class GameEngine {
     // Initiale dans la tête
     const initial = new PIXI.Text(name.charAt(0).toUpperCase(), {
       fontFamily: 'Arial Black, Arial, sans-serif',
-      fontSize: 13,
+      fontSize: 15,
       fill: 0xFFFFFF,
       fontWeight: 'bold',
     });
@@ -1080,21 +1080,22 @@ export class GameEngine {
 
     // Nom du joueur (badge sous le coureur)
     const labelBg = new PIXI.Graphics();
-    const labelWidth = Math.max(name.length * 6 + 10, 40);
-    labelBg.beginFill(color, 0.8);
-    labelBg.drawRoundedRect(playerX - labelWidth / 2, centerY + 17, labelWidth, 16, 4);
+    const labelWidth = Math.max(name.length * 7 + 12, 46);
+    labelBg.beginFill(color, 0.95);
+    labelBg.lineStyle(1, 0xFFFFFF, 0.5);
+    labelBg.drawRoundedRect(playerX - labelWidth / 2, centerY + 19, labelWidth, 18, 5);
     labelBg.endFill();
     this.trackContainer.addChild(labelBg);
 
     const label = new PIXI.Text(name, {
       fontFamily: 'Arial, sans-serif',
-      fontSize: 9,
+      fontSize: 10,
       fill: 0xFFFFFF,
       fontWeight: 'bold',
     });
     label.anchor.set(0.5);
     label.x = playerX;
-    label.y = centerY + 25;
+    label.y = centerY + 28;
     this.trackContainer.addChild(label);
 
     // Indicateur de position (score)
