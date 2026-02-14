@@ -251,6 +251,10 @@ input[type="text"]::placeholder {
 /* ============================
    ÉCRAN DE JEU
    ============================ */
+#overlay:has(.game-overlay) {
+  background: transparent;
+}
+
 .game-overlay {
   width: 100%;
   max-width: 420px;

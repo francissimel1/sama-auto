@@ -99,6 +99,7 @@ export class GameEngine {
   private showOverlay(html: string): void {
     this.overlay.innerHTML = html;
     this.overlay.style.display = 'flex';
+    this.overlay.style.background = '';
   }
 
   private hideOverlay(): void {
@@ -746,6 +747,9 @@ export class GameEngine {
         <div class="feedback" id="game-feedback"></div>
       </div>
     `);
+
+    // Rendre l'overlay transparent pendant le jeu pour voir la piste PixiJS
+    this.overlay.style.background = 'transparent';
 
     const input = document.getElementById('game-input') as HTMLInputElement;
     const feedback = document.getElementById('game-feedback') as HTMLDivElement;
