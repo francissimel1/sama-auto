@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>TapTapGO - Générateur d'icônes PWA</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #1A1A2E; color: #EAEAEA; padding: 40px; text-align: center; }
+    h1 { color: #FF6B35; }
+    p { color: #AAAACC; margin-bottom: 20px; }
+    canvas { border: 1px solid #3D3D5A; margin: 10px; cursor: pointer; }
+    .instructions { background: #0D0D1A; padding: 20px; border-radius: 12px; max-width: 500px; margin: 20px auto; text-align: left; }
+    .instructions li { margin: 8px 0; }
+    button { padding: 12px 24px; background: #FF6B35; color: #fff; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin: 8px; }
+    button:hover { background: #E85A25; }
+  </style>
+</head>
+<body>
+  <h1>Générateur d'icônes TapTapGO</h1>
+  <p>Cliquez sur chaque canvas pour télécharger l'icône correspondante</p>
+
+  <div>
+    <h3>192x192</h3>
+    <canvas id="icon192" width="192" height="192"></canvas>
+    <br/>
+    <button onclick="download('icon192', 'icon-192.png')">Télécharger 192x192</button>
+  </div>
+
+  <div>
+    <h3>512x512</h3>
+    <canvas id="icon512" width="512" height="512"></canvas>
+    <br/>
+    <button onclick="download('icon512', 'icon-512.png')">Télécharger 512x512</button>
+  </div>
+
+  <div class="instructions">
+    <h3>Instructions :</h3>
+    <ol>
+      <li>Cliquez sur les boutons ci-dessus pour télécharger les icônes</li>
+      <li>Placez <code>icon-192.png</code> et <code>icon-512.png</code> dans le dossier <code>public/icons/</code></li>
+      <li>Les icônes sont générées avec le logo TapTapGO</li>
+    </ol>
+  </div>
+
+  <script>
+    function drawIcon(canvasId, size) {
+      const canvas = document.getElementById(canvasId);
+      const ctx = canvas.getContext('2d');
+      const s = size;
+
+      // Fond
+      ctx.fillStyle = '#1A1A2E';
+      ctx.fillRect(0, 0, s, s);
+
+      // Cercle décoratif
+      ctx.beginPath();
+      ctx.arc(s / 2, s / 2, s * 0.4, 0, Math.PI * 2);
+      ctx.fillStyle = '#004E89';
+      ctx.fill();
+
+      // Cercle intérieur
+      ctx.beginPath();
+      ctx.arc(s / 2, s / 2, s * 0.32, 0, Math.PI * 2);
+      ctx.fillStyle = '#1A1A2E';
+      ctx.fill();
+
+      // Éclair stylisé
+      ctx.fillStyle = '#F7B801';
+      ctx.beginPath();
+      const cx = s / 2;
+      const cy = s / 2;
+      const scale = s / 100;
+      ctx.moveTo(cx - 2 * scale, cy - 22 * scale);
+      ctx.lineTo(cx + 12 * scale, cy - 22 * scale);
+      ctx.lineTo(cx + 2 * scale, cy - 2 * scale);
+      ctx.lineTo(cx + 14 * scale, cy - 2 * scale);
+      ctx.lineTo(cx - 6 * scale, cy + 24 * scale);
+      ctx.lineTo(cx, cy + 4 * scale);
+      ctx.lineTo(cx - 12 * scale, cy + 4 * scale);
+      ctx.closePath();
+      ctx.fill();
+
+      // Texte "TTG"
+      ctx.fillStyle = '#FF6B35';
+      ctx.font = `bold ${s * 0.12}px Arial Black, Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('TTG', cx, cy + s * 0.38);
+    }
+
+    function download(canvasId, filename) {
+      const canvas = document.getElementById(canvasId);
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    // Dessiner les icônes
+    drawIcon('icon192', 192);
+    drawIcon('icon512', 512);
+  </script>
+</body>
+</html>
