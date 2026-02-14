@@ -315,8 +315,8 @@ export class GameEngine {
       if (this.firebaseService.isConfigured()) {
         this.createRoom();
       } else {
-        // Mode solo direct si Firebase non configuré
-        this.startSoloGame();
+        // Montrer la salle d'attente même sans Firebase (bot rejoindra automatiquement)
+        this.showWaitingRoomOffline();
       }
     });
 
@@ -505,6 +505,73 @@ export class GameEngine {
   }
 
   // ==========================================
+  // SALLE D'ATTENTE HORS LIGNE (sans Firebase)
+  // ==========================================
+  private showWaitingRoomOffline(): void {
+    this.currentScreen = 'waiting';
+    console.log('[GameEngine] Écran: Salle d\'attente (offline)');
+
+    const fakeCode = this.generateOfflineCode();
+
+    this.app.stage.removeChildren();
+    const bg = new PIXI.Graphics();
+    bg.beginFill(COLORS.background);
+    bg.drawRect(0, 0, CANVAS.width, CANVAS.height);
+    bg.endFill();
+    this.app.stage.addChild(bg);
+
+    this.showOverlay(`
+      <div class="screen-content">
+        <h2 class="title" style="color: ${CSS_COLORS.primary}; font-size: 28px;">En attente...</h2>
+        <p class="subtitle">Partage ce code avec ton adversaire</p>
+        <div class="room-code">${fakeCode}</div>
+        <div class="waiting-dots">
+          <span class="dot dot-1"></span>
+          <span class="dot dot-2"></span>
+          <span class="dot dot-3"></span>
+        </div>
+        <p class="hint" style="color: ${CSS_COLORS.accent};">Mode hors-ligne : un bot rejoindra dans <span id="bot-countdown-offline">10</span>s</p>
+        <button id="btn-cancel-wait-offline" class="btn btn-outline" style="margin-top: 20px;">Annuler</button>
+      </div>
+    `);
+
+    let countdown = 10;
+    const countdownEl = document.getElementById('bot-countdown-offline');
+    const countdownInterval = setInterval(() => {
+      countdown--;
+      if (countdownEl) countdownEl.textContent = String(countdown);
+      if (countdown <= 0) clearInterval(countdownInterval);
+    }, 1000);
+
+    this.botJoinTimeout = setTimeout(() => {
+      clearInterval(countdownInterval);
+      console.log('[GameEngine] Bot rejoint la partie (mode offline)');
+      this.hideOverlay();
+      this.startSoloGame();
+    }, 10000);
+
+    document.getElementById('btn-cancel-wait-offline')?.addEventListener('click', () => {
+      clearInterval(countdownInterval);
+      if (this.botJoinTimeout) {
+        clearTimeout(this.botJoinTimeout);
+        this.botJoinTimeout = null;
+      }
+      this.hideOverlay();
+      this.showMenu();
+    });
+  }
+
+  // Génère un faux code de room pour le mode offline
+  private generateOfflineCode(): string {
+    const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const digits = '0123456789';
+    let code = '';
+    for (let i = 0; i < 2; i++) code += letters[Math.floor(Math.random() * letters.length)];
+    for (let i = 0; i < 2; i++) code += digits[Math.floor(Math.random() * digits.length)];
+    return code;
+  }
+
+  // ==========================================
   // DÉMARRAGE PARTIE SOLO (avec bot)
   // ==========================================
   private startSoloGame(): void {
@@ -689,7 +756,7 @@ export class GameEngine {
     setTimeout(() => input.focus(), 100);
   }
 
-  // Dessine la piste d'athlétisme
+  // Dessine la piste d'athlétisme réaliste
   private drawTrack(): void {
     if (this.trackContainer) {
       this.app.stage.removeChild(this.trackContainer);
@@ -698,125 +765,321 @@ export class GameEngine {
     this.trackContainer = new PIXI.Container();
     this.app.stage.addChild(this.trackContainer);
 
-    const trackY = 50;
-    const trackHeight = 200;
-    const laneHeight = 70;
-    const trackWidth = CANVAS.width - 40;
-    const trackX = 20;
+    // Dimensions de la piste
+    const trackX = 15;
+    const trackY = 30;
+    const trackWidth = CANVAS.width - 30;
+    const trackHeight = 220;
+    const laneHeight = 50;
+    const laneGap = 4;
+    const lane1Y = trackY + 55;
+    const lane2Y = lane1Y + laneHeight + laneGap;
+    const cornerRadius = 28;
 
-    // Fond de la piste
-    const trackBg = new PIXI.Graphics();
-    trackBg.beginFill(COLORS.trackGray);
-    trackBg.drawRoundedRect(trackX, trackY, trackWidth, trackHeight, 12);
-    trackBg.endFill();
-    this.trackContainer.addChild(trackBg);
+    // === FOND TERRAIN (vert gazon) ===
+    const field = new PIXI.Graphics();
+    field.beginFill(0x1B5E20, 0.15);
+    field.drawRoundedRect(trackX - 5, trackY - 5, trackWidth + 10, trackHeight + 10, cornerRadius + 5);
+    field.endFill();
+    this.trackContainer.addChild(field);
 
-    // Lignes de la piste
+    // === SURFACE DE LA PISTE (rouge brique) ===
+    const trackSurface = new PIXI.Graphics();
+    trackSurface.beginFill(0xC62828, 0.85);
+    trackSurface.drawRoundedRect(trackX, trackY, trackWidth, trackHeight, cornerRadius);
+    trackSurface.endFill();
+    this.trackContainer.addChild(trackSurface);
+
+    // === BORDURE EXTÉRIEURE ===
+    const outerBorder = new PIXI.Graphics();
+    outerBorder.lineStyle(2, 0xFFFFFF, 0.6);
+    outerBorder.drawRoundedRect(trackX + 2, trackY + 2, trackWidth - 4, trackHeight - 4, cornerRadius - 2);
+    this.trackContainer.addChild(outerBorder);
+
+    // === ZONE INTÉRIEURE (gazon central) ===
+    const innerField = new PIXI.Graphics();
+    innerField.beginFill(0x2E7D32, 0.3);
+    innerField.drawRoundedRect(trackX + 12, trackY + 12, trackWidth - 24, 32, 10);
+    innerField.endFill();
+    this.trackContainer.addChild(innerField);
+
+    // === TITRE de la piste ===
+    const trackTitle = new PIXI.Text('COURSE TapTapGO', {
+      fontFamily: 'Arial Black, Arial, sans-serif',
+      fontSize: 13,
+      fill: 0xFFFFFF,
+      fontWeight: 'bold',
+      letterSpacing: 2,
+    });
+    trackTitle.anchor.set(0.5);
+    trackTitle.x = CANVAS.width / 2;
+    trackTitle.y = trackY + 28;
+    this.trackContainer.addChild(trackTitle);
+
+    // === COULOIRS (lanes) ===
+    for (let lane = 0; lane < 2; lane++) {
+      const laneY = lane === 0 ? lane1Y : lane2Y;
+      const laneColor = lane === 0 ? 0xD32F2F : 0xB71C1C;
+
+      // Fond du couloir
+      const laneBg = new PIXI.Graphics();
+      laneBg.beginFill(laneColor, 0.6);
+      laneBg.drawRoundedRect(trackX + 8, laneY, trackWidth - 16, laneHeight, 8);
+      laneBg.endFill();
+      this.trackContainer.addChild(laneBg);
+
+      // Bordure blanche du couloir
+      const laneBorder = new PIXI.Graphics();
+      laneBorder.lineStyle(1, 0xFFFFFF, 0.35);
+      laneBorder.drawRoundedRect(trackX + 8, laneY, trackWidth - 16, laneHeight, 8);
+      this.trackContainer.addChild(laneBorder);
+
+      // Numéro du couloir
+      const laneNum = new PIXI.Text(`${lane + 1}`, {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: 14,
+        fill: 0xFFFFFF,
+        fontWeight: 'bold',
+      });
+      laneNum.anchor.set(0.5);
+      laneNum.alpha = 0.4;
+      laneNum.x = trackX + 20;
+      laneNum.y = laneY + laneHeight / 2;
+      this.trackContainer.addChild(laneNum);
+    }
+
+    // === MARQUAGES DE DISTANCE (lignes verticales) ===
+    const runAreaX = trackX + 35;
+    const runAreaWidth = trackWidth - 55;
+
     for (let i = 0; i <= PHRASES_TO_WIN; i++) {
-      const x = trackX + (trackWidth / PHRASES_TO_WIN) * i;
+      const x = runAreaX + (runAreaWidth / PHRASES_TO_WIN) * i;
+      const isFinish = i === PHRASES_TO_WIN;
+
       const line = new PIXI.Graphics();
-      line.lineStyle(1, COLORS.trackLine, 0.5);
-      line.moveTo(x, trackY);
-      line.lineTo(x, trackY + trackHeight);
+      if (isFinish) {
+        // Ligne d'arrivée : damier
+        line.lineStyle(3, COLORS.accent, 1);
+      } else {
+        line.lineStyle(1, 0xFFFFFF, i === 0 ? 0.7 : 0.3);
+      }
+      line.moveTo(x, lane1Y - 2);
+      line.lineTo(x, lane2Y + laneHeight + 2);
       this.trackContainer.addChild(line);
 
-      // Numéro en haut
-      if (i < PHRASES_TO_WIN) {
-        const num = new PIXI.Text(`${i + 1}`, {
+      // Labels de distance (en mètres simulés)
+      if (i > 0) {
+        const distLabel = new PIXI.Text(isFinish ? '🏁' : `${i * 20}m`, {
           fontFamily: 'Arial, sans-serif',
-          fontSize: 12,
-          fill: 0x666688,
+          fontSize: isFinish ? 14 : 10,
+          fill: isFinish ? COLORS.accent : 0xFFFFFF,
+          fontWeight: isFinish ? 'bold' : 'normal',
         });
-        num.anchor.set(0.5);
-        num.x = x + (trackWidth / PHRASES_TO_WIN) / 2;
-        num.y = trackY + 12;
-        this.trackContainer.addChild(num);
+        distLabel.anchor.set(0.5);
+        distLabel.alpha = isFinish ? 1 : 0.5;
+        distLabel.x = x;
+        distLabel.y = lane1Y - 12;
+        this.trackContainer.addChild(distLabel);
       }
     }
 
-    // Ligne d'arrivée
-    const finishX = trackX + trackWidth;
-    const finish = new PIXI.Graphics();
-    finish.lineStyle(3, COLORS.accent, 1);
-    finish.moveTo(finishX, trackY);
-    finish.lineTo(finishX, trackY + trackHeight);
-    this.trackContainer.addChild(finish);
+    // === LIGNE DE DÉPART ===
+    const startLine = new PIXI.Graphics();
+    startLine.lineStyle(2, 0xFFFFFF, 0.8);
+    startLine.moveTo(runAreaX, lane1Y - 2);
+    startLine.lineTo(runAreaX, lane2Y + laneHeight + 2);
+    this.trackContainer.addChild(startLine);
 
-    const finishLabel = new PIXI.Text('FIN', {
+    const startLabel = new PIXI.Text('START', {
       fontFamily: 'Arial, sans-serif',
-      fontSize: 11,
+      fontSize: 9,
+      fill: 0xFFFFFF,
+      fontWeight: 'bold',
+      letterSpacing: 1,
+    });
+    startLabel.anchor.set(0.5);
+    startLabel.alpha = 0.6;
+    startLabel.x = runAreaX;
+    startLabel.y = lane2Y + laneHeight + 14;
+    this.trackContainer.addChild(startLabel);
+
+    // === DAMIER D'ARRIVÉE ===
+    const finishX = runAreaX + runAreaWidth;
+    this.drawCheckerboard(finishX - 4, lane1Y - 2, 8, laneHeight * 2 + laneGap + 4);
+
+    const finishLabel = new PIXI.Text('FINISH', {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: 9,
       fill: COLORS.accent,
       fontWeight: 'bold',
+      letterSpacing: 1,
     });
     finishLabel.anchor.set(0.5);
     finishLabel.x = finishX;
-    finishLabel.y = trackY - 12;
+    finishLabel.y = lane2Y + laneHeight + 14;
     this.trackContainer.addChild(finishLabel);
 
-    // Lane 1 : Joueur (moi)
-    const myLaneY = trackY + 25;
+    // === AVATARS DES JOUEURS ===
     this.drawPlayerOnTrack(
       this.myPlayer?.pseudo || 'Moi',
       this.myPlayer?.position || 0,
-      trackX,
-      myLaneY,
-      trackWidth,
+      runAreaX,
+      lane1Y,
+      runAreaWidth,
+      laneHeight,
       COLORS.primary,
+      true,
     );
 
-    // Lane 2 : Adversaire
-    const opLaneY = trackY + 25 + laneHeight;
     this.drawPlayerOnTrack(
       this.opponent?.pseudo || 'Adversaire',
       this.opponent?.position || 0,
-      trackX,
-      opLaneY,
-      trackWidth,
-      COLORS.secondary,
+      runAreaX,
+      lane2Y,
+      runAreaWidth,
+      laneHeight,
+      this.opponent?.isBot ? 0x2ECC71 : COLORS.secondary,
+      false,
     );
   }
 
-  // Dessine un joueur sur la piste
+  // Dessine un motif damier (ligne d'arrivée)
+  private drawCheckerboard(x: number, y: number, width: number, height: number): void {
+    const cellSize = 6;
+    const cols = Math.ceil(width / cellSize);
+    const rows = Math.ceil(height / cellSize);
+    const checker = new PIXI.Graphics();
+
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const isBlack = (row + col) % 2 === 0;
+        checker.beginFill(isBlack ? 0x000000 : 0xFFFFFF, isBlack ? 0.8 : 0.9);
+        checker.drawRect(
+          x + col * cellSize,
+          y + row * cellSize,
+          cellSize,
+          cellSize
+        );
+        checker.endFill();
+      }
+    }
+    this.trackContainer.addChild(checker);
+  }
+
+  // Dessine un joueur (avatar coureur) sur la piste
   private drawPlayerOnTrack(
     name: string,
     position: number,
-    trackX: number,
+    runAreaX: number,
     laneY: number,
-    trackWidth: number,
+    runAreaWidth: number,
+    laneHeight: number,
     color: number,
+    isPlayer: boolean,
   ): void {
-    const stepWidth = trackWidth / PHRASES_TO_WIN;
-    const playerX = trackX + stepWidth * position + 15;
+    const stepWidth = runAreaWidth / PHRASES_TO_WIN;
+    const playerX = runAreaX + stepWidth * position + 18;
+    const centerY = laneY + laneHeight / 2;
 
-    // Cercle du joueur
-    const circle = new PIXI.Graphics();
-    circle.beginFill(color);
-    circle.drawCircle(playerX, laneY + 20, 16);
-    circle.endFill();
-    this.trackContainer.addChild(circle);
+    // Ombre au sol
+    const shadow = new PIXI.Graphics();
+    shadow.beginFill(0x000000, 0.2);
+    shadow.drawEllipse(playerX, centerY + 14, 12, 4);
+    shadow.endFill();
+    this.trackContainer.addChild(shadow);
 
-    // Initiale dans le cercle
+    // Corps du coureur (silhouette stylisée)
+    const runner = new PIXI.Graphics();
+
+    // Jambes (en mouvement)
+    const legAngle = position > 0 ? Math.sin(position * 1.5) * 0.3 : 0;
+    runner.lineStyle(3, color, 1);
+    // Jambe arrière
+    runner.moveTo(playerX, centerY + 4);
+    runner.lineTo(playerX - 5 - legAngle * 10, centerY + 14);
+    // Jambe avant
+    runner.moveTo(playerX, centerY + 4);
+    runner.lineTo(playerX + 5 + legAngle * 10, centerY + 14);
+
+    // Bras (en mouvement)
+    runner.lineStyle(2, color, 0.9);
+    // Bras arrière
+    runner.moveTo(playerX, centerY - 4);
+    runner.lineTo(playerX - 6 + legAngle * 8, centerY + 2);
+    // Bras avant
+    runner.moveTo(playerX, centerY - 4);
+    runner.lineTo(playerX + 6 - legAngle * 8, centerY + 2);
+    this.trackContainer.addChild(runner);
+
+    // Tête (cercle avec initiale)
+    const headRadius = 11;
+    const headY = centerY - 13;
+
+    // Contour lumineux autour de la tête
+    const glow = new PIXI.Graphics();
+    glow.beginFill(color, 0.2);
+    glow.drawCircle(playerX, headY, headRadius + 4);
+    glow.endFill();
+    this.trackContainer.addChild(glow);
+
+    // Cercle de la tête
+    const head = new PIXI.Graphics();
+    head.beginFill(color);
+    head.lineStyle(2, 0xFFFFFF, 0.8);
+    head.drawCircle(playerX, headY, headRadius);
+    head.endFill();
+    this.trackContainer.addChild(head);
+
+    // Initiale dans la tête
     const initial = new PIXI.Text(name.charAt(0).toUpperCase(), {
-      fontFamily: 'Arial, sans-serif',
-      fontSize: 16,
+      fontFamily: 'Arial Black, Arial, sans-serif',
+      fontSize: 13,
       fill: 0xFFFFFF,
       fontWeight: 'bold',
     });
     initial.anchor.set(0.5);
     initial.x = playerX;
-    initial.y = laneY + 20;
+    initial.y = headY;
     this.trackContainer.addChild(initial);
 
-    // Nom du joueur
+    // Nom du joueur (badge sous le coureur)
+    const labelBg = new PIXI.Graphics();
+    const labelWidth = Math.max(name.length * 6 + 10, 40);
+    labelBg.beginFill(color, 0.8);
+    labelBg.drawRoundedRect(playerX - labelWidth / 2, centerY + 17, labelWidth, 16, 4);
+    labelBg.endFill();
+    this.trackContainer.addChild(labelBg);
+
     const label = new PIXI.Text(name, {
       fontFamily: 'Arial, sans-serif',
-      fontSize: 11,
-      fill: COLORS.text,
+      fontSize: 9,
+      fill: 0xFFFFFF,
+      fontWeight: 'bold',
     });
     label.anchor.set(0.5);
     label.x = playerX;
-    label.y = laneY + 45;
+    label.y = centerY + 25;
     this.trackContainer.addChild(label);
+
+    // Indicateur de position (score)
+    if (position > 0) {
+      const scoreBadge = new PIXI.Graphics();
+      scoreBadge.beginFill(COLORS.accent);
+      scoreBadge.drawRoundedRect(playerX + headRadius + 2, headY - 8, 16, 16, 4);
+      scoreBadge.endFill();
+      this.trackContainer.addChild(scoreBadge);
+
+      const scoreText = new PIXI.Text(`${position}`, {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: 10,
+        fill: 0x000000,
+        fontWeight: 'bold',
+      });
+      scoreText.anchor.set(0.5);
+      scoreText.x = playerX + headRadius + 10;
+      scoreText.y = headY;
+      this.trackContainer.addChild(scoreText);
+    }
   }
 
   // Met à jour la piste
