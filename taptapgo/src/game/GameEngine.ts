@@ -517,6 +517,7 @@ export class GameEngine {
     const countdownInterval = setInterval(() => {
       countdown--;
       if (countdownEl) countdownEl.textContent = String(countdown);
+      if (countdown <= 5) this.soundManager.play('tick');
       if (countdown <= 0) clearInterval(countdownInterval);
     }, 1000);
 
@@ -590,6 +591,7 @@ export class GameEngine {
     const countdownInterval = setInterval(() => {
       countdown--;
       if (countdownEl) countdownEl.textContent = String(countdown);
+      if (countdown <= 5) this.soundManager.play('tick');
       if (countdown <= 0) clearInterval(countdownInterval);
     }, 1000);
 
@@ -767,6 +769,7 @@ export class GameEngine {
         if (this.myPlayer) this.myPlayer.position++;
 
         // Feedback positif
+        this.soundManager.play('correct');
         feedback.textContent = 'Correct !';
         feedback.className = 'feedback feedback-success';
 
@@ -803,6 +806,7 @@ export class GameEngine {
         }
       } else {
         // Mauvaise réponse
+        this.soundManager.play('wrong');
         feedback.textContent = 'Incorrect, réessaie !';
         feedback.className = 'feedback feedback-error';
         input.select();
@@ -1216,6 +1220,9 @@ export class GameEngine {
     const accuracy = this.totalAttempts > 0 ? this.correctAnswers / this.totalAttempts : 0;
 
     console.log(`[GameEngine] Fin de partie - ${won ? 'Victoire' : 'Défaite'}`);
+
+    // Son de fin de partie
+    this.soundManager.play(won ? 'win' : 'lose');
 
     // Arrêter le bot
     if (this.botAI) {
