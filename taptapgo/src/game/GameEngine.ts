@@ -7,6 +7,7 @@ import { StatsManager } from './StatsManager.js';
 import { PhraseManager } from './PhraseManager.js';
 import { BotAI } from './BotAI.js';
 import { FirebaseService } from '../multiplayer/FirebaseService.js';
+import { SoundManager } from './SoundManager.js';
 
 export class GameEngine {
   private app!: PIXI.Application;
@@ -14,6 +15,7 @@ export class GameEngine {
   private phraseManager: PhraseManager;
   private botAI: BotAI | null = null;
   private firebaseService: FirebaseService;
+  private soundManager: SoundManager;
 
   private currentScreen: GameScreen = 'splash';
   private overlay!: HTMLDivElement;
@@ -37,6 +39,7 @@ export class GameEngine {
     this.statsManager = new StatsManager();
     this.phraseManager = new PhraseManager();
     this.firebaseService = new FirebaseService();
+    this.soundManager = new SoundManager();
     console.log('[GameEngine] Moteur initialisé');
   }
 
