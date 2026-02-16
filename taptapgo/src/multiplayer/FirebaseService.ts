@@ -156,7 +156,7 @@ export class FirebaseService {
       return {
         ...roomData,
         players,
-        status: 'playing' as RoomStatus,
+        status: (isFull ? 'playing' : 'waiting') as RoomStatus,
       };
     } catch (e: any) {
       this.lastError = `Erreur réseau: ${e?.message || 'connexion impossible'}`;
@@ -214,6 +214,30 @@ export class FirebaseService {
       await update(roomRef, updates);
     } catch (e) {
       console.error('[FirebaseService] Erreur update position:', e);
+    }
+  }
+
+  // Démarre la partie (host uniquement, minimum 2 joueurs)
+  async startGame(code: string): Promise<boolean> {
+    if (!this.initialized || !this.db) return false;
+
+    try {
+      const { ref, get, update } = await import('firebase/database');
+      const roomId = code.toLowerCase();
+      const roomRef = ref(this.db, `rooms/${roomId}`);
+
+      const snapshot = await get(roomRef);
+      if (!snapshot.exists()) return false;
+
+      const roomData = snapshot.val();
+      if (roomData.players && roomData.players.length >= 2) {
+        await update(roomRef, { status: 'playing' });
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.error('[FirebaseService] Erreur démarrage partie:', e);
+      return false;
     }
   }
 

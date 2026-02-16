@@ -394,7 +394,13 @@ export class GameEngine {
         this.opponents = room.players.filter(p => p.id !== playerId);
 
         this.hideOverlay();
-        this.startMultiplayerGame(code);
+        if (room.status === 'playing') {
+          // Room pleine, on lance directement
+          this.startMultiplayerGame(code);
+        } else {
+          // En attente que l'hôte démarre
+          this.showWaitingRoomJoiner(code);
+        }
       } else {
         const errorMsg = this.firebaseService.getLastError() || 'Room introuvable ou pleine';
         errorEl.textContent = errorMsg;
@@ -508,7 +514,8 @@ export class GameEngine {
         </div>
         <p class="hint" id="waiting-players">Joueurs : 1/${MAX_PLAYERS}</p>
         <p class="hint" id="waiting-hint">Un bot rejoindra automatiquement dans <span id="bot-countdown">30</span>s</p>
-        <button id="btn-cancel-wait" class="btn btn-outline" style="margin-top: 20px;">Annuler</button>
+        <button id="btn-start-game" class="btn btn-primary btn-large" style="margin-top: 12px; display: none;">D\u00e9marrer la partie</button>
+        <button id="btn-cancel-wait" class="btn btn-outline" style="margin-top: 8px;">Annuler</button>
       </div>
     `);
 
@@ -522,15 +529,26 @@ export class GameEngine {
       if (countdown <= 0) clearInterval(countdownInterval);
     }, 1000);
 
+    let gameStarted = false;
+
     // Écouter l'arrivée des joueurs via Firebase
     this.firebaseService.onRoomChange(code, (room) => {
+      if (gameStarted) return;
+
       // Mettre à jour le compteur de joueurs
       const playerCount = room.players?.length || 1;
       const waitingPlayersEl = document.getElementById('waiting-players');
       if (waitingPlayersEl) waitingPlayersEl.textContent = `Joueurs : ${playerCount}/${MAX_PLAYERS}`;
 
-      // La room est pleine, on lance la partie
-      if (room.players && room.players.length >= MAX_PLAYERS && room.status === 'playing') {
+      // Afficher le bouton "Démarrer" dès 2 joueurs (hôte uniquement)
+      const startBtn = document.getElementById('btn-start-game');
+      if (startBtn && playerCount >= 2) {
+        startBtn.style.display = '';
+      }
+
+      // La partie démarre (room pleine ou démarrage manuel par l'hôte)
+      if (room.status === 'playing' && room.players && room.players.length >= 2) {
+        gameStarted = true;
         clearInterval(countdownInterval);
         if (this.botJoinTimeout) {
           clearTimeout(this.botJoinTimeout);
@@ -543,8 +561,16 @@ export class GameEngine {
       }
     });
 
+    // Bouton "Démarrer la partie" (hôte)
+    document.getElementById('btn-start-game')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btn-start-game') as HTMLButtonElement;
+      if (btn) { btn.disabled = true; btn.textContent = 'Lancement...'; }
+      await this.firebaseService.startGame(code);
+    });
+
     // Timer pour le bot (30s)
     this.botJoinTimeout = setTimeout(() => {
+      if (gameStarted) return;
       clearInterval(countdownInterval);
       console.log('[GameEngine] Timeout - Bot rejoint la partie');
       this.firebaseService.cleanup();
@@ -558,6 +584,52 @@ export class GameEngine {
         clearTimeout(this.botJoinTimeout);
         this.botJoinTimeout = null;
       }
+      this.firebaseService.cleanup();
+      this.hideOverlay();
+      this.showMenu();
+    });
+  }
+
+  // ==========================================
+  // SALLE D'ATTENTE JOUEUR (non-hôte)
+  // ==========================================
+  private showWaitingRoomJoiner(code: string): void {
+    this.currentScreen = 'waiting';
+    console.log(`[GameEngine] Écran: Salle d'attente joueur - Code: ${code}`);
+
+    this.showOverlay(`
+      <div class="screen-content">
+        <h2 class="title" style="color: ${CSS_COLORS.primary}; font-size: 28px;">Room ${this.escapeHtml(code)}</h2>
+        <p class="subtitle">En attente du lancement par l'h&ocirc;te...</p>
+        <div class="waiting-dots">
+          <span class="dot dot-1"></span>
+          <span class="dot dot-2"></span>
+          <span class="dot dot-3"></span>
+        </div>
+        <p class="hint" id="waiting-players-joiner">Joueurs : ${1 + this.opponents.length}/${MAX_PLAYERS}</p>
+        <button id="btn-cancel-wait-joiner" class="btn btn-outline" style="margin-top: 20px;">Quitter</button>
+      </div>
+    `);
+
+    this.firebaseService.onRoomChange(code, (room) => {
+      // Mettre à jour le compteur
+      const playerCount = room.players?.length || 1;
+      const el = document.getElementById('waiting-players-joiner');
+      if (el) el.textContent = `Joueurs : ${playerCount}/${MAX_PLAYERS}`;
+
+      // Mettre à jour la liste d'adversaires
+      if (room.players) {
+        this.opponents = room.players.filter((p: Player) => p.id !== this.myPlayer?.id);
+      }
+
+      // L'hôte a lancé la partie
+      if (room.status === 'playing' && room.players && room.players.length >= 2) {
+        this.hideOverlay();
+        this.startMultiplayerGame(code);
+      }
+    });
+
+    document.getElementById('btn-cancel-wait-joiner')?.addEventListener('click', () => {
       this.firebaseService.cleanup();
       this.hideOverlay();
       this.showMenu();
