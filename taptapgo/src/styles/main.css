@@ -262,7 +262,7 @@ input[type="text"]::placeholder {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding-top: 135px; /* Espace pour la piste PixiJS en dessous */
+  padding-top: 75px; /* Espace pour la piste PixiJS en dessous */
 }
 
 .game-header {
@@ -433,7 +433,7 @@ input[type="text"]::placeholder {
    ============================ */
 @media (max-height: 600px) {
   .game-overlay {
-    padding-top: 210px;
+    padding-top: 150px;
   }
 
   .phrase-display {

@@ -753,6 +753,9 @@ export class GameEngine {
       </div>
     `);
 
+    // Lancer la musique de fond
+    this.soundManager.startBgMusic();
+
     // Rendre l'overlay transparent pendant le jeu pour voir la piste PixiJS
     this.overlay.style.background = 'transparent';
 
@@ -1221,7 +1224,8 @@ export class GameEngine {
 
     console.log(`[GameEngine] Fin de partie - ${won ? 'Victoire' : 'Défaite'}`);
 
-    // Son de fin de partie
+    // Arrêter la musique de fond et jouer le son de fin
+    this.soundManager.stopBgMusic();
     this.soundManager.play(won ? 'win' : 'lose');
 
     // Arrêter le bot
