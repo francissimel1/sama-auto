@@ -1200,18 +1200,6 @@ export class GameEngine {
     head.endFill();
     this.trackContainer.addChild(head);
 
-    // Initiale dans la tête
-    const initial = new PIXI.Text(name.charAt(0).toUpperCase(), {
-      fontFamily: 'Arial Black, Arial, sans-serif',
-      fontSize: 15,
-      fill: 0xFFFFFF,
-      fontWeight: 'bold',
-    });
-    initial.anchor.set(0.5);
-    initial.x = playerX;
-    initial.y = headY;
-    this.trackContainer.addChild(initial);
-
     // Nom du joueur (badge sous le coureur)
     const labelBg = new PIXI.Graphics();
     const labelWidth = Math.max(name.length * 7 + 12, 46);
