@@ -78,13 +78,11 @@ export const PSEUDO_KEY = 'taptapgo_pseudo';
 
 // Configuration Firebase (placeholder - à remplir par l'utilisateur)
 export const FIREBASE_CONFIG = {
-  // ⚠️ REMPLACEZ CES VALEURS PAR VOTRE PROPRE CONFIGURATION FIREBASE
-  // Voir FIREBASE_SETUP.md pour les instructions
-  apiKey: '',
-  authDomain: '',
-  databaseURL: '',
-  projectId: '',
-  storageBucket: '',
-  messagingSenderId: '',
-  appId: '',
+  apiKey: 'AIzaSyC4bAed6NFXdPHs8DCxJa8m_E59xsZmtkQ',
+  authDomain: 'taptap-f7f94.firebaseapp.com',
+  databaseURL: 'https://taptap-f7f94-default-rtdb.europe-west1.firebasedatabase.app',
+  projectId: 'taptap-f7f94',
+  storageBucket: 'taptap-f7f94.firebasestorage.app',
+  messagingSenderId: '364908386765',
+  appId: '1:364908386765:web:7e188fcf080bd54f7acc84',
 };
