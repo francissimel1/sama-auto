@@ -35,6 +35,7 @@ export class SoundManager {
 
   startBgMusic(): void {
     if (this.muted) return;
+    this.bgMusic.volume(0.3);
     if (!this.bgMusic.playing()) {
       this.bgMusic.play();
     }
@@ -42,7 +43,10 @@ export class SoundManager {
 
   stopBgMusic(): void {
     this.bgMusic.fade(this.bgMusic.volume(), 0, 500);
-    setTimeout(() => this.bgMusic.stop(), 500);
+    setTimeout(() => {
+      this.bgMusic.stop();
+      this.bgMusic.volume(0.3);
+    }, 500);
   }
 
   toggleMute(): boolean {
