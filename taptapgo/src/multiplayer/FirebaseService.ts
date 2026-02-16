@@ -1,6 +1,6 @@
 // Service de connexion Firebase pour le multijoueur temps réel
 
-import { FIREBASE_CONFIG, ROOM_CODE_LENGTH } from '../config/constants.js';
+import { FIREBASE_CONFIG, ROOM_CODE_LENGTH, MAX_PLAYERS, PHRASES_TO_WIN } from '../config/constants.js';
 import { Room, Player, RoomStatus } from '../types/index.js';
 
 // Types Firebase (pour éviter l'import si non configuré)
@@ -138,17 +138,18 @@ export class FirebaseService {
         return null;
       }
 
-      if (roomData.players && roomData.players.length >= 2) {
-        this.lastError = `La room "${code}" est pleine (2/2 joueurs).`;
+      if (roomData.players && roomData.players.length >= MAX_PLAYERS) {
+        this.lastError = `La room "${code}" est pleine (${MAX_PLAYERS}/${MAX_PLAYERS} joueurs).`;
         console.warn(`[FirebaseService] Room ${code} est pleine`);
         return null;
       }
 
       // Ajouter le joueur
       const players = [...(roomData.players || []), player];
+      const isFull = players.length >= MAX_PLAYERS;
       await update(this.roomRef, {
         players,
-        status: 'playing',
+        status: isFull ? 'playing' : 'waiting',
       });
 
       console.log(`[FirebaseService] Rejoint room ${code} avec succès`);
@@ -205,7 +206,7 @@ export class FirebaseService {
       const updates: Record<string, any> = { players };
 
       // Vérifier victoire
-      if (position >= 5) {
+      if (position >= PHRASES_TO_WIN) {
         updates.status = 'finished';
         updates.winner = playerId;
       }

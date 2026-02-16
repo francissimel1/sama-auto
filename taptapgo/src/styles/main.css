@@ -275,10 +275,20 @@ input[type="text"]::placeholder {
   border-radius: 12px;
 }
 
+.game-header-multi {
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 12px;
+}
+
 .game-score {
   font-size: 14px;
   font-weight: 700;
   color: #EAEAEA;
+}
+
+.game-score-me {
+  color: #FF6B35;
 }
 
 .game-vs {

@@ -2,7 +2,7 @@
 
 import * as PIXI from 'pixi.js';
 import { GameScreen, Player, GameResult } from '../types/index.js';
-import { COLORS, CSS_COLORS, CANVAS, PHRASES_TO_WIN, SPLASH_DURATION, BOT_JOIN_DELAY } from '../config/constants.js';
+import { COLORS, CSS_COLORS, CANVAS, PHRASES_TO_WIN, SPLASH_DURATION, BOT_JOIN_DELAY, MAX_PLAYERS, PLAYER_COLORS } from '../config/constants.js';
 import { StatsManager } from './StatsManager.js';
 import { PhraseManager } from './PhraseManager.js';
 import { BotAI } from './BotAI.js';
@@ -22,7 +22,7 @@ export class GameEngine {
 
   // État du jeu
   private myPlayer: Player | null = null;
-  private opponent: Player | null = null;
+  private opponents: Player[] = [];
   private roomCode: string = '';
   private isHost: boolean = false;
   private gameStartTime: number = 0;
@@ -390,8 +390,8 @@ export class GameEngine {
         this.isHost = false;
         this.isUsingBot = false;
 
-        // Trouver l'adversaire
-        this.opponent = room.players.find(p => p.id !== playerId) || null;
+        // Trouver les adversaires
+        this.opponents = room.players.filter(p => p.id !== playerId);
 
         this.hideOverlay();
         this.startMultiplayerGame(code);
@@ -506,6 +506,7 @@ export class GameEngine {
           <span class="dot dot-2"></span>
           <span class="dot dot-3"></span>
         </div>
+        <p class="hint" id="waiting-players">Joueurs : 1/${MAX_PLAYERS}</p>
         <p class="hint" id="waiting-hint">Un bot rejoindra automatiquement dans <span id="bot-countdown">30</span>s</p>
         <button id="btn-cancel-wait" class="btn btn-outline" style="margin-top: 20px;">Annuler</button>
       </div>
@@ -521,15 +522,21 @@ export class GameEngine {
       if (countdown <= 0) clearInterval(countdownInterval);
     }, 1000);
 
-    // Écouter l'arrivée d'un joueur via Firebase
+    // Écouter l'arrivée des joueurs via Firebase
     this.firebaseService.onRoomChange(code, (room) => {
-      if (room.players && room.players.length >= 2 && room.status === 'playing') {
+      // Mettre à jour le compteur de joueurs
+      const playerCount = room.players?.length || 1;
+      const waitingPlayersEl = document.getElementById('waiting-players');
+      if (waitingPlayersEl) waitingPlayersEl.textContent = `Joueurs : ${playerCount}/${MAX_PLAYERS}`;
+
+      // La room est pleine, on lance la partie
+      if (room.players && room.players.length >= MAX_PLAYERS && room.status === 'playing') {
         clearInterval(countdownInterval);
         if (this.botJoinTimeout) {
           clearTimeout(this.botJoinTimeout);
           this.botJoinTimeout = null;
         }
-        this.opponent = room.players.find(p => p.id !== this.myPlayer?.id) || null;
+        this.opponents = room.players.filter(p => p.id !== this.myPlayer?.id);
         this.isUsingBot = false;
         this.hideOverlay();
         this.startMultiplayerGame(code);
@@ -630,12 +637,12 @@ export class GameEngine {
       isBot: false,
     };
 
-    this.opponent = {
+    this.opponents = [{
       id: 'bot_' + Date.now(),
       pseudo: this.botAI.getPseudo(),
       position: 0,
       isBot: true,
-    };
+    }];
 
     // Générer les phrases
     this.phraseManager.generateGamePhrases();
@@ -660,9 +667,30 @@ export class GameEngine {
     this.totalAttempts = 0;
     this.gameStartTime = Date.now();
 
+    // Fonction commune pour mettre à jour les positions des adversaires
+    const updateOpponents = (room: any) => {
+      if (room.players) {
+        const otherPlayers = room.players.filter((p: Player) => p.id !== this.myPlayer?.id);
+        for (const other of otherPlayers) {
+          const existing = this.opponents.find(o => o.id === other.id);
+          if (existing) {
+            existing.position = other.position;
+          } else {
+            this.opponents.push(other);
+          }
+        }
+        this.updateTrack();
+        this.updateScores();
+      }
+
+      // Vérifier si un adversaire a gagné
+      if (room.status === 'finished' && room.winner && room.winner !== this.myPlayer?.id) {
+        this.endGame(false);
+      }
+    };
+
     // Si on est le joueur qui rejoint, récupérer les phrases AVANT d'afficher l'écran
     if (!this.isHost) {
-      // Attendre que les phrases arrivent de Firebase avant d'afficher
       let phrasesLoaded = false;
       this.firebaseService.onRoomChange(code, (room) => {
         // Synchroniser les phrases une seule fois
@@ -673,15 +701,7 @@ export class GameEngine {
           this.showGameScreen();
         }
 
-        // Mettre à jour la position de l'adversaire
-        if (room.players) {
-          const opponentData = room.players.find((p: Player) => p.id !== this.myPlayer?.id);
-          if (opponentData && this.opponent) {
-            this.opponent.position = opponentData.position;
-            this.updateTrack();
-            this.updateScores();
-          }
-        }
+        updateOpponents(room);
 
         // Mettre à jour l'affichage de la phrase si elle a changé (pour le joueur qui rejoint)
         if (phrasesLoaded) {
@@ -691,29 +711,11 @@ export class GameEngine {
             phraseDisplay.textContent = currentPhrase;
           }
         }
-
-        // Vérifier si l'adversaire a gagné
-        if (room.status === 'finished' && room.winner && room.winner !== this.myPlayer?.id) {
-          this.endGame(false);
-        }
       });
     } else {
       // Pour l'hôte, écouter les mises à jour de la room
       this.firebaseService.onRoomChange(code, (room) => {
-        // Mettre à jour la position de l'adversaire
-        if (room.players) {
-          const opponentData = room.players.find((p: Player) => p.id !== this.myPlayer?.id);
-          if (opponentData && this.opponent) {
-            this.opponent.position = opponentData.position;
-            this.updateTrack();
-            this.updateScores();
-          }
-        }
-
-        // Vérifier si l'adversaire a gagné
-        if (room.status === 'finished' && room.winner && room.winner !== this.myPlayer?.id) {
-          this.endGame(false);
-        }
+        updateOpponents(room);
       });
 
       this.showGameScreen();
@@ -736,12 +738,15 @@ export class GameEngine {
     const currentPhrase = this.phraseManager.getCurrentPhrase();
     const phraseIndex = this.phraseManager.getCurrentIndex();
 
+    const opponentScoresHtml = this.opponents.map((op, i) =>
+      `<span class="game-score" id="opponent-score-${i}">${this.escapeHtml(op.pseudo)}: ${op.position || 0}/${PHRASES_TO_WIN}</span>`
+    ).join('');
+
     this.showOverlay(`
       <div class="game-overlay">
-        <div class="game-header">
-          <span class="game-score" id="my-score">${this.myPlayer?.pseudo}: ${this.myPlayer?.position || 0}/${PHRASES_TO_WIN}</span>
-          <span class="game-vs">VS</span>
-          <span class="game-score" id="opponent-score">${this.opponent?.pseudo}: ${this.opponent?.position || 0}/${PHRASES_TO_WIN}</span>
+        <div class="game-header game-header-multi">
+          <span class="game-score game-score-me" id="my-score">${this.myPlayer?.pseudo}: ${this.myPlayer?.position || 0}/${PHRASES_TO_WIN}</span>
+          ${opponentScoresHtml}
         </div>
         <div class="phrase-counter">Phrase ${phraseIndex + 1}/${PHRASES_TO_WIN}</div>
         <div class="phrase-display" id="phrase-display">${this.escapeHtml(currentPhrase)}</div>
@@ -846,15 +851,18 @@ export class GameEngine {
     this.trackContainer = new PIXI.Container();
     this.app.stage.addChild(this.trackContainer);
 
-    // Dimensions de la piste
+    // Nombre total de couloirs (moi + adversaires)
+    const totalLanes = 1 + this.opponents.length;
+
+    // Dimensions de la piste (adaptatives)
     const trackX = 15;
     const trackY = 30;
     const trackWidth = CANVAS.width - 30;
-    const trackHeight = 220;
-    const laneHeight = 50;
+    const laneHeight = totalLanes <= 2 ? 50 : 38;
     const laneGap = 4;
-    const lane1Y = trackY + 55;
-    const lane2Y = lane1Y + laneHeight + laneGap;
+    const headerHeight = 45;
+    const lanesBlockHeight = totalLanes * laneHeight + (totalLanes - 1) * laneGap;
+    const trackHeight = headerHeight + lanesBlockHeight + 15;
     const cornerRadius = 28;
 
     // === FOND TERRAIN (vert gazon) ===
@@ -898,9 +906,12 @@ export class GameEngine {
     this.trackContainer.addChild(trackTitle);
 
     // === COULOIRS (lanes) ===
-    for (let lane = 0; lane < 2; lane++) {
-      const laneY = lane === 0 ? lane1Y : lane2Y;
-      const laneColor = lane === 0 ? 0xD32F2F : 0xB71C1C;
+    const firstLaneY = trackY + headerHeight;
+    const laneYPositions: number[] = [];
+    for (let lane = 0; lane < totalLanes; lane++) {
+      const laneY = firstLaneY + lane * (laneHeight + laneGap);
+      laneYPositions.push(laneY);
+      const laneColor = lane % 2 === 0 ? 0xD32F2F : 0xB71C1C;
 
       // Fond du couloir
       const laneBg = new PIXI.Graphics();
@@ -918,7 +929,7 @@ export class GameEngine {
       // Numéro du couloir
       const laneNum = new PIXI.Text(`${lane + 1}`, {
         fontFamily: 'Arial, sans-serif',
-        fontSize: 16,
+        fontSize: totalLanes <= 2 ? 16 : 12,
         fill: 0xFFFFFF,
         fontWeight: 'bold',
       });
@@ -928,6 +939,8 @@ export class GameEngine {
       laneNum.y = laneY + laneHeight / 2;
       this.trackContainer.addChild(laneNum);
     }
+
+    const lastLaneY = laneYPositions[laneYPositions.length - 1];
 
     // === MARQUAGES DE DISTANCE (lignes verticales) ===
     const runAreaX = trackX + 35;
@@ -939,13 +952,12 @@ export class GameEngine {
 
       const line = new PIXI.Graphics();
       if (isFinish) {
-        // Ligne d'arrivée : damier
         line.lineStyle(3, COLORS.accent, 1);
       } else {
         line.lineStyle(1.5, 0xFFFFFF, i === 0 ? 0.9 : 0.5);
       }
-      line.moveTo(x, lane1Y - 2);
-      line.lineTo(x, lane2Y + laneHeight + 2);
+      line.moveTo(x, firstLaneY - 2);
+      line.lineTo(x, lastLaneY + laneHeight + 2);
       this.trackContainer.addChild(line);
 
       // Labels de distance (en mètres simulés)
@@ -959,7 +971,7 @@ export class GameEngine {
         distLabel.anchor.set(0.5);
         distLabel.alpha = isFinish ? 1 : 0.75;
         distLabel.x = x;
-        distLabel.y = lane1Y - 12;
+        distLabel.y = firstLaneY - 12;
         this.trackContainer.addChild(distLabel);
       }
     }
@@ -967,8 +979,8 @@ export class GameEngine {
     // === LIGNE DE DÉPART ===
     const startLine = new PIXI.Graphics();
     startLine.lineStyle(2, 0xFFFFFF, 0.8);
-    startLine.moveTo(runAreaX, lane1Y - 2);
-    startLine.lineTo(runAreaX, lane2Y + laneHeight + 2);
+    startLine.moveTo(runAreaX, firstLaneY - 2);
+    startLine.lineTo(runAreaX, lastLaneY + laneHeight + 2);
     this.trackContainer.addChild(startLine);
 
     const startLabel = new PIXI.Text('START', {
@@ -981,12 +993,12 @@ export class GameEngine {
     startLabel.anchor.set(0.5);
     startLabel.alpha = 0.6;
     startLabel.x = runAreaX;
-    startLabel.y = lane2Y + laneHeight + 14;
+    startLabel.y = lastLaneY + laneHeight + 14;
     this.trackContainer.addChild(startLabel);
 
     // === DAMIER D'ARRIVÉE ===
     const finishX = runAreaX + runAreaWidth;
-    this.drawCheckerboard(finishX - 4, lane1Y - 2, 8, laneHeight * 2 + laneGap + 4);
+    this.drawCheckerboard(finishX - 4, firstLaneY - 2, 8, lanesBlockHeight + 4);
 
     const finishLabel = new PIXI.Text('FINISH', {
       fontFamily: 'Arial, sans-serif',
@@ -997,31 +1009,36 @@ export class GameEngine {
     });
     finishLabel.anchor.set(0.5);
     finishLabel.x = finishX;
-    finishLabel.y = lane2Y + laneHeight + 14;
+    finishLabel.y = lastLaneY + laneHeight + 14;
     this.trackContainer.addChild(finishLabel);
 
     // === AVATARS DES JOUEURS ===
+    // Couloir 1 : mon joueur
     this.drawPlayerOnTrack(
       this.myPlayer?.pseudo || 'Moi',
       this.myPlayer?.position || 0,
       runAreaX,
-      lane1Y,
+      laneYPositions[0],
       runAreaWidth,
       laneHeight,
-      COLORS.primary,
+      PLAYER_COLORS[0],
       true,
     );
 
-    this.drawPlayerOnTrack(
-      this.opponent?.pseudo || 'Adversaire',
-      this.opponent?.position || 0,
-      runAreaX,
-      lane2Y,
-      runAreaWidth,
-      laneHeight,
-      this.opponent?.isBot ? 0x2ECC71 : COLORS.secondary,
-      false,
-    );
+    // Couloirs suivants : adversaires
+    for (let i = 0; i < this.opponents.length; i++) {
+      const op = this.opponents[i];
+      this.drawPlayerOnTrack(
+        op.pseudo || 'Adversaire',
+        op.position || 0,
+        runAreaX,
+        laneYPositions[i + 1],
+        runAreaWidth,
+        laneHeight,
+        op.isBot ? 0x2ECC71 : PLAYER_COLORS[(i + 1) % PLAYER_COLORS.length],
+        false,
+      );
+    }
   }
 
   // Dessine un motif damier (ligne d'arrivée)
@@ -1172,12 +1189,14 @@ export class GameEngine {
   // Met à jour les scores affichés
   private updateScores(): void {
     const myScore = document.getElementById('my-score');
-    const opScore = document.getElementById('opponent-score');
     if (myScore && this.myPlayer) {
       myScore.textContent = `${this.myPlayer.pseudo}: ${this.myPlayer.position}/${PHRASES_TO_WIN}`;
     }
-    if (opScore && this.opponent) {
-      opScore.textContent = `${this.opponent.pseudo}: ${this.opponent.position}/${PHRASES_TO_WIN}`;
+    for (let i = 0; i < this.opponents.length; i++) {
+      const opScore = document.getElementById(`opponent-score-${i}`);
+      if (opScore) {
+        opScore.textContent = `${this.opponents[i].pseudo}: ${this.opponents[i].position}/${PHRASES_TO_WIN}`;
+      }
     }
   }
 
@@ -1188,23 +1207,24 @@ export class GameEngine {
     const phrase = this.phraseManager.getCurrentPhrase();
     if (!phrase) return;
 
+    const botPlayer = this.opponents[0];
     this.botAI.startTyping(phrase, (correct: boolean) => {
-      if (!this.opponent || this.currentScreen !== 'game') return;
+      if (!botPlayer || this.currentScreen !== 'game') return;
 
       if (correct) {
-        this.opponent.position++;
+        botPlayer.position++;
         this.updateTrack();
         this.updateScores();
 
         // Le bot a gagné ?
-        if (this.opponent.position >= PHRASES_TO_WIN) {
+        if (botPlayer.position >= PHRASES_TO_WIN) {
           this.endGame(false);
           return;
         }
 
         // Le bot continue sur la phrase suivante si la partie n'est pas finie
         if (this.currentScreen === 'game') {
-          const nextPhrase = this.phraseManager.getGamePhrases()[this.opponent.position];
+          const nextPhrase = this.phraseManager.getGamePhrases()[botPlayer.position];
           if (nextPhrase) {
             this.botAI?.startTyping(nextPhrase, arguments.callee.bind(this) as (correct: boolean) => void);
           }
@@ -1267,10 +1287,11 @@ export class GameEngine {
             <span class="stat-label">Mon score</span>
             <span class="stat-value">${this.myPlayer?.position || 0}/${PHRASES_TO_WIN}</span>
           </div>
+          ${this.opponents.map(op => `
           <div class="stat-row">
-            <span class="stat-label">${this.escapeHtml(this.opponent?.pseudo || 'Adversaire')}</span>
-            <span class="stat-value">${this.opponent?.position || 0}/${PHRASES_TO_WIN}</span>
-          </div>
+            <span class="stat-label">${this.escapeHtml(op.pseudo)}</span>
+            <span class="stat-value">${op.position || 0}/${PHRASES_TO_WIN}</span>
+          </div>`).join('')}
         </div>
 
         <div class="menu-buttons">

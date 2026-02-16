@@ -9,6 +9,9 @@ export const SPLASH_DURATION = 2000;
 // Délai avant que le bot rejoigne (ms)
 export const BOT_JOIN_DELAY = 30000;
 
+// Nombre max de joueurs en multijoueur
+export const MAX_PLAYERS = 4;
+
 // Configuration du bot
 export const BOT_CONFIG = {
   // Temps par caractère (ms)
@@ -44,6 +47,9 @@ export const CSS_COLORS = {
   success: '#2ECC71',
   error: '#E74C3C',
 };
+
+// Couleurs des joueurs (jusqu'à 4)
+export const PLAYER_COLORS = [0xFF6B35, 0x004E89, 0x9B59B6, 0x2ECC71];
 
 // Dimensions du canvas (responsive)
 export const CANVAS = {
